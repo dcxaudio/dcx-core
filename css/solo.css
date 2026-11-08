@@ -26,6 +26,7 @@
 /* ---------------------------------------------------------------- pagina */
 .solo { max-width: 1240px; margin: 0 auto; padding: 24px 16px 16px; }
 .solo .rack { margin-top: 0; }
+@media (max-width: 900px) { .solo { padding: 12px 8px; } }
 .solo-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
 .solo-title { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--page-ink); }
 .solo-help { margin: 14px 0 0; font-size: 13px; line-height: 1.5; color: var(--page-ink); }

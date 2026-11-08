@@ -168,6 +168,11 @@ button:focus-visible, .knob:focus-visible, .fader:focus-visible { outline: 2px s
 }
 .rack-ear:last-child { border-radius: 0 4px 4px 0; background: linear-gradient(270deg, #18191a, var(--rack-ear) 40%, #262729); }
 .rack-ear i { width: 15px; height: 9px; border-radius: 5px; background: #060606; box-shadow: inset 0 1px 2px #000, 0 1px 0 #34363a; }
+@media (max-width: 900px) {
+  .rack { grid-template-columns: 14px minmax(0, 1fr) 14px; margin-top: 12px; }
+  .rack-ear { padding: 16px 0; }
+  .rack-ear i { width: 8px; height: 6px; }
+}
 
 /* ---------------------------------------------------------------- MIDI Learn: os controles que aprendem ficam tracejados; o escolhido acende */
 body.learning [data-learn] { outline: 1px dashed rgba(75, 138, 208, .6); outline-offset: 2px; }
