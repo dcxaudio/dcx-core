@@ -149,3 +149,18 @@ RJ.dsp = (function () {
   return { toMono, resample, quantize, process, peak, encodeWav,
            base64ToArrayBuffer, arrayBufferToBase64, floatToB64, b64ToFloat, downloadBlob };
 })();
+
+/**
+ * Cruzamento por zero mais perto de i, ate win amostras (dir: -1 antes, 1 depois, 0 os dois).
+ * Devolve { pos, found }. Usado nos pontos de corte e de loop.
+ */
+RJ.nearZero = function (raw, i, win, dir = 0) {
+  i = Math.max(1, Math.min(raw.length - 1, i));
+  const cross = k => k >= 1 && k < raw.length && (raw[k - 1] <= 0) !== (raw[k] <= 0);
+  const pick = k => (Math.abs(raw[k - 1]) < Math.abs(raw[k]) ? k - 1 : k);
+  for (let d = 0; d <= win; d++) {
+    if ((dir <= 0 || !d) && cross(i - d)) return { pos: pick(i - d), found: true };
+    if (dir >= 0 && d && cross(i + d)) return { pos: pick(i + d), found: true };
+  }
+  return { pos: i, found: false };
+};

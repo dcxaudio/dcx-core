@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DCX MIDI Teste</title>
+<!--
+  DCX MIDI Teste: testa controladores MIDI no navegador e gera um relatório.
+  Parte da DCX Audio, GPL-3.0. HTML/CSS/JS puros, sem build.
+  Chrome ou Edge (Web MIDI). Abra por http://localhost (python3 -m http.server).
+-->
+<style>
+  :root {
+    --bg: #1d1c1b; --panel: #262524; --line: #3a3836; --ink: #e2dfd8; --dim: #8e8b85;
+    --acc: #ff5a2b; --ok: #7fc46b; --warn: #e3b341; --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --font: "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f2f0eb; --panel: #fff; --line: #d8d4cc; --ink: #222; --dim: #6b6862; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font); }
+  header, main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  h1 { font-size: 18px; margin: 0; letter-spacing: .02em; }
+  h1 b { color: var(--acc); }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin: 0 0 8px; }
+  .spacer { flex: 1; }
+  button { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+  button.main { background: var(--acc); border-color: var(--acc); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .4; cursor: default; }
+  label { color: var(--dim); font-size: 13px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 16px; min-width: 0; }
+  #status { color: var(--dim); }
+  #status.ok { color: var(--ok); } #status.err { color: var(--acc); }
+  ul.devs { list-style: none; margin: 0; padding: 0; }
+  ul.devs li { padding: 4px 0; border-bottom: 1px solid var(--line); }
+  ul.devs li:last-child { border: 0; }
+  .tag { font-size: 11px; color: var(--dim); }
+  #log { font: 12px/1.5 var(--mono); height: 220px; overflow: auto; white-space: pre; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--dim); font-weight: 500; font-size: 12px; }
+  td.num { font-family: var(--mono); text-align: right; }
+  td input { width: 110px; font: inherit; background: transparent; color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 2px 4px; }
+  tr.hot td { background: color-mix(in srgb, var(--acc) 18%, transparent); }
+  .bar { height: 6px; background: var(--line); border-radius: 3px; width: 80px; position: relative; }
+  .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--acc); border-radius: 3px; }
+  .warn { color: var(--warn); }
+  .help { color: var(--dim); font-size: 13px; margin: 0; }
+  #report { width: 100%; height: 200px; font: 12px/1.5 var(--mono); background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1><b>DCX</b> MIDI Teste</h1>
+  <button class="main" id="connect">Ligar MIDI</button>
+  <span id="status">Desligado</span>
+  <span class="spacer"></span>
+  <label><input type="checkbox" id="ignoreClock" checked> ignorar clock e active sensing</label>
+  <button id="clear">Limpar</button>
+</header>
+<main>
+  <p class="help">Ligue o controlador no USB, clique em <b>Ligar MIDI</b> e mexa em cada pad, knob, fader e roda.
+    Cada controle vira uma linha na tabela, e você pode dar um nome a cada um. Para medir a fluidez, mova o controle rápido por alguns segundos.
+    No fim, gere o relatório.</p>
+
+  <div class="grid">
+    <section>
+      <h2>Aparelhos</h2>
+      <ul class="devs" id="devs"><li class="tag">Nenhum ainda.</li></ul>
+    </section>
+    <section>
+      <h2>Mensagens ao vivo</h2>
+      <div id="log"></div>
+    </section>
+  </div>
+
+  <section>
+    <h2>Controles</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr>
+          <th>Nome</th><th>Aparelho</th><th>Tipo</th><th>Canal</th><th>Nº</th>
+          <th>Último</th><th></th><th>Mín</th><th>Máx</th><th>Msgs</th><th>Valores</th>
+          <th>Resolução</th><th>Maior salto</th><th>Msgs/s (pico)</th><th>Intervalo (mediana / p95)</th><th>Obs.</th>
+        </tr></thead>
+        <tbody id="ctrls"><tr><td colspan="16" class="tag">Mexa em algum controle.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Relatório</h2>
+    <p>
+      <button id="gen">Gerar relatório</button>
+      <button id="copy" disabled>Copiar</button>
+      <button id="dlmd" disabled>Baixar .md</button>
+      <button id="dljson" disabled>Baixar .json</button>
+    </p>
+    <textarea id="report" readonly placeholder="O relatório aparece aqui."></textarea>
+  </section>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const noteName = n => NOTE_NAMES[n % 12] + (Math.floor(n / 12) - 1);
+  const hex = b => b.toString(16).toUpperCase().padStart(2, "0");
+
+  const state = {
+    access: null,
+    devices: new Map(),   // id -> { name, manufacturer, kind, state }
+    ctrls: new Map(),     // key -> stats
+    log: [],
+    started: null,
+  };
+
+  // ---------- leitura das mensagens ----------
+  function decode(data) {
+    const s = data[0];
+    if (s >= 0xF0) {
+      const names = { 0xF8: "Clock", 0xFA: "Start", 0xFB: "Continue", 0xFC: "Stop", 0xFE: "Active Sensing", 0xF0: "SysEx" };
+      return { type: names[s] || "Sistema " + hex(s), sys: true, ch: null, num: null, value: null };
+    }
+    const t = s & 0xF0, ch = (s & 0x0F) + 1, d1 = data[1] ?? 0, d2 = data[2] ?? 0;
+    switch (t) {
+      case 0x90: return d2 === 0 ? { type: "Note Off", ch, num: d1, value: 0, off: true } : { type: "Note", ch, num: d1, value: d2 };
+      case 0x80: return { type: "Note Off", ch, num: d1, value: d2, off: true };
+      case 0xB0: return { type: "CC", ch, num: d1, value: d2 };
+      case 0xE0: return { type: "Pitch Bend", ch, num: null, value: (d2 << 7) | d1, lsb: d1 };
+      case 0xD0: return { type: "Aftertouch", ch, num: null, value: d1 };
+      case 0xA0: return { type: "Poly AT", ch, num: d1, value: d2 };
+      case 0xC0: return { type: "Program", ch, num: d1, value: d1 };
+    }
+    return { type: "?", ch, num: d1, value: d2 };
+  }
+
+  function handle(devId, data, t) {
+    const now = t ?? performance.now();
+    const m = decode(data);
+    if (m.sys && $("ignoreClock").checked && (data[0] === 0xF8 || data[0] === 0xFE)) return;
+    if (!state.started) state.started = new Date();
+    const dev = state.devices.get(devId);
+    const devName = dev ? dev.name : devId;
+    let txt = m.type + (m.ch ? " ch" + m.ch : "");
+    if (m.num != null && m.type !== "Program") txt += " " + (m.type.startsWith("Note") || m.type === "Poly AT" ? m.num + " (" + noteName(m.num) + ")" : m.num);
+    if (m.value != null) txt += " = " + m.value;
+    addLog(`${(now / 1000).toFixed(3).padStart(9)}  ${Array.from(data, hex).join(" ").padEnd(9)}  ${txt}   [${devName}]`);
+    if (m.sys) return;
+    // Note Off fica na mesma linha da Note (conta a soltura)
+    const type = m.off ? "Note" : m.type;
+    const key = [devId, type, m.ch, m.num].join("|");
+    let c = state.ctrls.get(key);
+    if (!c) {
+      c = { key, devId, devName, type, ch: m.ch, num: m.num, name: "", count: 0, offs: 0, min: Infinity, max: -Infinity,
+            last: null, values: new Set(), maxJump: 0, times: [], intervals: [], peakRate: 0, lsbNonZero: false,
+            centerReturns: 0, firstAt: now, lastAt: now };
+      state.ctrls.set(key, c);
+    }
+    if (m.off) { c.offs++; c.lastAt = now; c.hot = now; scheduleRender(); return; }
+    c.count++;
+    // salto: só para controles contínuos, e sem contar a volta da mola ao centro
+    const springBack = c.type === "Pitch Bend" && m.value === 8192;
+    if (c.last != null && c.type !== "Note" && !springBack) c.maxJump = Math.max(c.maxJump, Math.abs(m.value - c.last));
+    if (c.type === "Pitch Bend") {
+      if (m.lsb) c.lsbNonZero = true;
+      if (m.value === 8192 && c.last != null && c.last !== 8192) c.centerReturns++;
+    }
+    c.last = m.value; c.min = Math.min(c.min, m.value); c.max = Math.max(c.max, m.value);
+    c.values.add(m.value);
+    if (c.lastAt != null && c.count > 1) {
+      const dt = now - c.lastAt;
+      if (dt < 250) c.intervals.push(dt);   // só conta dentro de um movimento
+      if (c.intervals.length > 5000) c.intervals.splice(0, 1000);
+    }
+    c.times.push(now);
+    while (c.times.length && now - c.times[0] > 1000) c.times.shift();
+    c.peakRate = Math.max(c.peakRate, c.times.length);
+    c.lastAt = now; c.hot = now;
+    scheduleRender();
+  }
+
+  // ---------- análise ----------
+  const pct = (arr, p) => { if (!arr.length) return null; const s = [...arr].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.floor(p * s.length))]; };
+
+  function resolution(c) {
+    if (c.type === "Pitch Bend") {
+      return c.lsbNonZero ? "14 bits" : (c.count > 20 ? "14 bits nominal, 7 efetivos (LSB sempre 0)" : "14 bits");
+    }
+    if (c.type === "CC") {
+      if (c.num < 32 && findCtrl(c.devId, "CC", c.ch, c.num + 32)) return "14 bits (CC " + c.num + " + " + (c.num + 32) + ")";
+      if (c.num >= 32 && c.num < 64 && findCtrl(c.devId, "CC", c.ch, c.num - 32)) return "LSB do CC " + (c.num - 32);
+      return "7 bits";
+    }
+    if (c.type === "Note") return "7 bits (velocity)";
+    return "7 bits";
+  }
+  function findCtrl(devId, type, ch, num) { return state.ctrls.get([devId, type, ch, num].join("|")); }
+
+  function notes(c) {
+    const o = [];
+    if (c.type === "Pitch Bend" && c.centerReturns > 0) o.push("volta ao centro (mola), " + c.centerReturns + "×");
+    if (c.type === "Note") {
+      if (c.values.size === 1 && c.count > 3) o.push("velocity fixa");
+      if (c.offs === 0 && c.count > 0) o.push("sem Note Off");
+    }
+    if (c.type === "CC") {
+      if (c.values.size <= 2 && c.count > 3 && [...c.values].every(v => v === 0 || v === 127)) o.push("parece botão (0/127)");
+      else if (c.min > 0 || c.max < 127) if (c.count > 20) o.push("não chegou a 0–127");
+      if (c.maxJump > 16 && c.count > 20) o.push("saltos grandes");
+    }
+    const p95 = pct(c.intervals, .95);
+    if (p95 != null && c.intervals.length > 30 && p95 > 30) o.push("intervalos irregulares");
+    return o.join("; ");
+  }
+
+  function summary(c) {
+    const med = pct(c.intervals, .5), p95 = pct(c.intervals, .95);
+    return {
+      nome: c.name || "", aparelho: c.devName, tipo: c.type, canal: c.ch, numero: c.num,
+      nota: c.type === "Note" ? noteName(c.num) : undefined,
+      mensagens: c.count, solturas: c.type === "Note" ? c.offs : undefined,
+      min: c.min === Infinity ? null : c.min, max: c.max === -Infinity ? null : c.max,
+      valores_distintos: c.values.size, resolucao: resolution(c), maior_salto: c.maxJump,
+      pico_msgs_por_s: c.peakRate,
+      intervalo_mediana_ms: med == null ? null : +med.toFixed(1),
+      intervalo_p95_ms: p95 == null ? null : +p95.toFixed(1),
+      obs: notes(c),
+    };
+  }
+
+  // ---------- tela ----------
+  function addLog(line) {
+    state.log.push(line);
+    if (state.log.length > 300) state.log.shift();
+    logDirty = true; scheduleRender();
+  }
+  let pending = false, logDirty = false;
+  function scheduleRender() { if (!pending) { pending = true; requestAnimationFrame(render); } }
+
+  function render() {
+    pending = false;
+    if (logDirty) { const el = $("log"); el.textContent = state.log.join("\n"); el.scrollTop = el.scrollHeight; logDirty = false; }
+    const tb = $("ctrls");
+    if (!state.ctrls.size) { tb.innerHTML = '<tr><td colspan="16" class="tag">Mexa em algum controle.</td></tr>'; return; }
+    const now = performance.now();
+    const rows = [...state.ctrls.values()].sort((a, b) => a.devName.localeCompare(b.devName) || a.type.localeCompare(b.type) || (a.ch - b.ch) || ((a.num ?? -1) - (b.num ?? -1)));
+    // mantém os campos de nome sem recriar enquanto alguém digita
+    const focused = document.activeElement && document.activeElement.dataset.key;
+    if (tb.dataset.keys === rows.map(r => r.key).join(",") && focused) { updateCells(rows, now); return; }
+    tb.dataset.keys = rows.map(r => r.key).join(",");
+    tb.innerHTML = "";
+    for (const c of rows) {
+      const tr = document.createElement("tr");
+      tr.dataset.key = c.key;
+      tr.innerHTML = `<td><input data-key="${c.key}" placeholder="ex.: pad 1" value="${c.name.replace(/"/g, "&quot;")}"></td>
+        <td>${esc(c.devName)}</td><td>${c.type}</td><td class="num">${c.ch}</td>
+        <td class="num">${c.num == null ? "—" : c.type === "Note" ? c.num + " " + noteName(c.num) : c.num}</td>
+        <td class="num" data-f="last"></td><td data-f="bar"><div class="bar"><i></i></div></td>
+        <td class="num" data-f="min"></td><td class="num" data-f="max"></td><td class="num" data-f="count"></td>
+        <td class="num" data-f="vals"></td><td data-f="res"></td><td class="num" data-f="jump"></td>
+        <td class="num" data-f="rate"></td><td class="num" data-f="int"></td><td data-f="obs" class="warn"></td>`;
+      tb.appendChild(tr);
+    }
+    tb.querySelectorAll("input[data-key]").forEach(inp => inp.addEventListener("input", e => {
+      const c = state.ctrls.get(e.target.dataset.key); if (c) c.name = e.target.value;
+    }));
+    updateCells(rows, now);
+  }
+
+  function updateCells(rows, now) {
+    const tb = $("ctrls");
+    for (const c of rows) {
+      const tr = tb.querySelector(`tr[data-key="${CSS.escape(c.key)}"]`); if (!tr) continue;
+      const s = summary(c), full = c.type === "Pitch Bend" ? 16383 : 127;
+      const set = (f, v) => { const el = tr.querySelector(`[data-f="${f}"]`); if (el) el.textContent = v ?? "—"; };
+      set("last", c.last); set("min", s.min); set("max", s.max); set("count", c.count + (c.type === "Note" ? " / " + c.offs : ""));
+      set("vals", s.valores_distintos); set("res", s.resolucao); set("jump", s.maior_salto); set("rate", s.pico_msgs_por_s);
+      set("int", s.intervalo_mediana_ms == null ? "—" : s.intervalo_mediana_ms + " / " + s.intervalo_p95_ms + " ms");
+      set("obs", s.obs);
+      const bar = tr.querySelector(".bar i"); if (bar) bar.style.width = ((c.last ?? 0) / full * 100) + "%";
+      tr.classList.toggle("hot", now - c.hot < 300);
+    }
+    if (rows.some(c => now - c.hot < 300)) setTimeout(scheduleRender, 120);
+  }
+  const esc = s => String(s).replace(/[&<>]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch]));
+
+  function renderDevices() {
+    const ul = $("devs");
+    if (!state.devices.size) { ul.innerHTML = '<li class="tag">Nenhum aparelho MIDI encontrado. Ligue o controlador e ele aparece aqui.</li>'; return; }
+    ul.innerHTML = [...state.devices.values()].map(d =>
+      `<li>${esc(d.name)} <span class="tag">${d.kind === "input" ? "entrada" : "saída"} · ${esc(d.manufacturer || "fabricante não informado")} · ${d.state === "connected" ? "conectado" : "desconectado"}</span></li>`).join("");
+  }
+
+  // ---------- Web MIDI ----------
+  function setStatus(txt, cls) { const el = $("status"); el.textContent = txt; el.className = cls || ""; }
+
+  function scan() {
+    const a = state.access; if (!a) return;
+    for (const [id, p] of [...a.inputs, ...a.outputs]) {
+      state.devices.set(id, { id, name: p.name, manufacturer: p.manufacturer, kind: p.type, state: p.state });
+    }
+    for (const [id, inp] of a.inputs) inp.onmidimessage = e => handle(id, e.data, e.timeStamp);
+    renderDevices();
+    const n = [...a.inputs.values()].length;
+    setStatus(n ? `Ligado · ${n} entrada${n > 1 ? "s" : ""}` : "Ligado, sem entradas", n ? "ok" : "");
+  }
+
+  $("connect").addEventListener("click", async () => {
+    if (!navigator.requestMIDIAccess) { setStatus("Este navegador não tem Web MIDI. Use Chrome ou Edge.", "err"); return; }
+    try {
+      state.access = await navigator.requestMIDIAccess({ sysex: false });
+      state.access.onstatechange = scan;
+      scan();
+      $("connect").disabled = true;
+    } catch (err) {
+      setStatus("O navegador não liberou o MIDI (" + (err && err.name || err) + "). Clique em Permitir quando ele pedir.", "err");
+    }
+  });
+
+  $("clear").addEventListener("click", () => {
+    state.ctrls.clear(); state.log = []; state.started = null; logDirty = true;
+    $("ctrls").dataset.keys = ""; scheduleRender();
+  });
+
+  // ---------- relatório ----------
+  function buildReport() {
+    const ctrls = [...state.ctrls.values()].map(summary);
+    const data = {
+      ferramenta: "DCX MIDI Teste", gerado_em: new Date().toISOString(),
+      inicio: state.started ? state.started.toISOString() : null,
+      navegador: navigator.userAgent,
+      aparelhos: [...state.devices.values()].map(({ name, manufacturer, kind, state: st }) => ({ nome: name, fabricante: manufacturer, tipo: kind, estado: st })),
+      controles: ctrls,
+    };
+    const L = [];
+    L.push("# Relatório DCX MIDI Teste", "");
+    L.push(`- Gerado em: ${new Date().toLocaleString("pt-BR")}`);
+    L.push(`- Navegador: ${navigator.userAgent}`, "");
+    L.push("## Aparelhos", "");
+    if (!data.aparelhos.length) L.push("Nenhum.");
+    for (const d of data.aparelhos) L.push(`- ${d.nome} (${d.tipo === "input" ? "entrada" : "saída"}, ${d.fabricante || "fabricante não informado"}, ${d.estado === "connected" ? "conectado" : "desconectado"})`);
+    L.push("", "## Controles", "");
+    if (!ctrls.length) L.push("Nenhum controle foi mexido.");
+    else {
+      L.push("| Nome | Aparelho | Tipo | Canal | Nº | Mín | Máx | Msgs | Valores | Resolução | Maior salto | Msgs/s pico | Intervalo med/p95 (ms) | Obs. |");
+      L.push("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
+      for (const c of ctrls) {
+        const num = c.numero == null ? "—" : c.nota ? `${c.numero} (${c.nota})` : c.numero;
+        const msgs = c.solturas != null ? `${c.mensagens} (+${c.solturas} solturas)` : c.mensagens;
+        const int = c.intervalo_mediana_ms == null ? "—" : `${c.intervalo_mediana_ms} / ${c.intervalo_p95_ms}`;
+        L.push(`| ${c.nome || "—"} | ${c.aparelho} | ${c.tipo} | ${c.canal} | ${num} | ${c.min} | ${c.max} | ${msgs} | ${c.valores_distintos} | ${c.resolucao} | ${c.maior_salto} | ${c.pico_msgs_por_s} | ${int} | ${c.obs || ""} |`);
+      }
+    }
+    L.push("", "## Como ler", "");
+    L.push("- **Resolução:** 7 bits = 128 passos; 14 bits = 16.384 passos.");
+    L.push("- **Maior salto:** a maior diferença entre duas mensagens seguidas. Num movimento lento, um salto grande indica controle \"degrau\".");
+    L.push("- **Msgs/s pico e intervalo:** quantas mensagens por segundo o controle manda num movimento rápido. Intervalo menor e regular é mais fluido (bom para o scratch).");
+    L.push("- **Volta ao centro (mola):** o controle volta sozinho ao meio quando é solto, como o pitch wheel.");
+    return { md: L.join("\n"), json: JSON.stringify(data, null, 2) };
+  }
+  let last = null;
+  $("gen").addEventListener("click", () => {
+    last = buildReport(); $("report").value = last.md;
+    ["copy", "dlmd", "dljson"].forEach(id => $(id).disabled = false);
+  });
+  $("copy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(last.md); $("copy").textContent = "Copiado"; }
+    catch { $("report").select(); document.execCommand("copy"); $("copy").textContent = "Copiado"; }
+    setTimeout(() => $("copy").textContent = "Copiar", 1500);
+  });
+  function download(name, text, type) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  const stamp = () => new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
+  $("dlmd").addEventListener("click", () => download(`midi-relatorio-${stamp()}.md`, last.md, "text/markdown"));
+  $("dljson").addEventListener("click", () => download(`midi-relatorio-${stamp()}.json`, last.json, "application/json"));
+
+  // Para testes sem controlador: midiTeste.simular([0x90, 36, 100])
+  window.midiTeste = {
+    simular(bytes, devId = "simulado", t) {
+      if (!state.devices.has(devId)) { state.devices.set(devId, { id: devId, name: "Simulado", manufacturer: "DCX", kind: "input", state: "connected" }); renderDevices(); }
+      handle(devId, Uint8Array.from(bytes), t);
+    },
+    relatorio: () => buildReport(),
+    state,
+  };
+})();
+</script>
+</body>
+</html>
