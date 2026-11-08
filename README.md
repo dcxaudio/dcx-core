@@ -13,6 +13,7 @@ O código comum aos aparelhos da [DCX Audio](https://github.com/dcxaudio), sampl
 | `js/midimap.js` | MIDI Learn: mapa de mensagens MIDI para os controles |
 | `js/host.js` | o host: liga os aparelhos (saída, store, MIDI, envio de som entre eles) |
 | `js/learnbar.js` | barra de MIDI Learn para uma página sem o RJ-2000 |
+| `js/tape.js` | `RJ.Tape`: saturação de fita (AudioWorklet, tanh com ADAA); Drive 0 = som igual |
 | `css/base.css` | cores, fontes, teclas, LEDs, knobs, LCD e rack |
 | `css/solo.css` | página de um aparelho só: tela de ligar e barra de Learn |
 | `fonts/` | Archivo Narrow e VT323 (woff2, licença SIL OFL 1.1 junto) |

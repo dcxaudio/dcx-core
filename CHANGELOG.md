@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.1.0
+
+- Novo `js/tape.js`: `RJ.Tape`, saturação de fita em AudioWorklet (tanh com ADAA de 1ª ordem, pré e de-ênfase, perda de agudos e wow/flutter leve). Entra um sinal, sai o mesmo com cara de fita; Drive 0 sai bit a bit igual. Veio do RJ-42, onde nasceu; o RJ-42 e a mesa (master) do DCX Studio passam a usar esta cópia.
+
 ## v1.0.0
 
 Primeira versão separada do [RJ-2000](https://github.com/dcxaudio/rj-2000). O histórico dos arquivos vem junto.
