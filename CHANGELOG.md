@@ -1,5 +1,8 @@
 # Changelog
 
+## Não publicado (auditoria 18/11/2026)
+
+- `output.js`: o som volta sozinho depois de ligação, tela bloqueada ou troca de app: religa em qualquer estado que não seja "running" nem "closed" (inclui o "interrupted" do iPhone), com `.catch`, e uma vez por contexto escuta `visibilitychange`, `pageshow`, `statechange` e o próximo toque ou tecla, só com a régua ligada. `RJ.setAudioSession`: "playback" ao criar o contexto (toca com a chave de silencioso do iPhone), "play-and-record" com o microfone aberto no `RJ.Sampler` (P0-01, P0-02).
 ## v1.1.0
 
 - Novo `js/tape.js`: `RJ.Tape`, saturação de fita em AudioWorklet (tanh com ADAA de 1ª ordem, pré e de-ênfase, perda de agudos e wow/flutter leve). Entra um sinal, sai o mesmo com cara de fita; Drive 0 sai bit a bit igual. Veio do RJ-42, onde nasceu; o RJ-42 e a mesa (master) do DCX Studio passam a usar esta cópia.

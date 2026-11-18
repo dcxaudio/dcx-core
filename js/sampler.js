@@ -29,9 +29,12 @@ RJ.Sampler = class {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       throw new Error("Este navegador nao permite gravar audio aqui");
     }
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-    });
+    if (RJ.setAudioSession) RJ.setAudioSession("play-and-record");
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      });
+    } catch (e) { if (RJ.setAudioSession) RJ.setAudioSession("playback"); throw e; }
     this.src = ctx.createMediaStreamSource(this.stream);
     // ScriptProcessor: antigo, mas funciona em todos os navegadores e ate abrindo o arquivo direto
     this.proc = ctx.createScriptProcessor(2048, 1, 1);
@@ -109,6 +112,7 @@ RJ.Sampler = class {
     if (this.src) this.src.disconnect();
     if (this.mute) this.mute.disconnect();
     if (this.stream) this.stream.getTracks().forEach(t => t.stop());
+    if (this.stream && RJ.setAudioSession) RJ.setAudioSession("playback");
     this.stream = null; this.state = "off"; this.level = 0;
   }
 };

@@ -80,6 +80,7 @@
       this.page = opts.page || "studio";
       this.ready = RJ.migrateStore(this.page, opts.migrate);
       this.engine = new RJ.Output();
+      this.engine.active = () => this.on;   // so religa o som sozinho com a regua ligada
       this.store = RJ.prefixedStore(this.page + "/", this.ready);
       this.learn = new RJ.MidiMap(this.store);
       // a entrada MIDI e da pagina: o Learn vem primeiro, depois os mapas padrao dos aparelhos
