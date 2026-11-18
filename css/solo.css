@@ -9,9 +9,10 @@
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
   background: rgba(10, 10, 10, 0.72);
   backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
-  transition: opacity .35s;
+  transition: opacity .35s, visibility 0s;
 }
-.power.off { opacity: 0; pointer-events: none; }
+/* desligada some do foco do teclado e do leitor de tela depois do esmaecer */
+.power.off { opacity: 0; pointer-events: none; visibility: hidden; transition: opacity .35s, visibility 0s .35s; }
 .power-btn {
   width: 128px; height: 128px; border-radius: 50%;
   border: 0; background: var(--key);
@@ -25,8 +26,21 @@
 
 /* ---------------------------------------------------------------- pagina */
 .solo { max-width: 1240px; margin: 0 auto; padding: 24px 16px 16px; }
+/* entalhe e barra de gestos (com viewport-fit=cover); sem eles, os mesmos valores */
+.solo {
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
 .solo .rack { margin-top: 0; }
-@media (max-width: 900px) { .solo { padding: 12px 8px; } }
+@media (max-width: 900px) {
+  .solo { padding: 12px 8px; }
+  .solo {
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+}
 .solo-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
 .solo-title { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--page-ink); }
 .solo-help { margin: 14px 0 0; font-size: 13px; line-height: 1.5; color: var(--page-ink); }
