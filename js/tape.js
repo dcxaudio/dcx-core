@@ -161,6 +161,9 @@ registerProcessor("rj-tape", RJTape);
      * ctx: AudioContext ou OfflineAudioContext.
      * opt.drive: Drive inicial (0 a 1). opt.adaa / opt.wow: false desliga (para medir).
      * Ate o worklet carregar, input liga direto no output (som igual ao Drive 0).
+     * ready: Promise de true (fita ligada) ou false (worklet nao carregou: o som
+     * passa direto, sem fita). available: o mesmo resultado sem esperar
+     * (null enquanto carrega), para o aparelho avisar "TAPE NOT AVAILABLE".
      */
     constructor(ctx, opt = {}) {
       this.ctx = ctx;
@@ -170,6 +173,7 @@ registerProcessor("rj-tape", RJTape);
       this.output = ctx.createGain();
       this.input.connect(this.output);
       this.node = null;
+      this.available = null;
       this.ready = load(ctx).then(ok => {
         if (!ok) return false;
         const n = new AudioWorkletNode(ctx, "rj-tape", {
@@ -183,7 +187,8 @@ registerProcessor("rj-tape", RJTape);
         this.input.disconnect(this.output);
         this.node = n;
         return true;
-      });
+      }).catch(e => { console.warn("Fita indisponivel", e); return false; })
+        .then(ok => { this.available = ok; return ok; });
     }
 
     /** Drive de 0 a 1. A suavizacao (~25 ms) fica no worklet, entao nao estala. */
