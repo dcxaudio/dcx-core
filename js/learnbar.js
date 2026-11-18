@@ -49,6 +49,8 @@ RJ.LearnBar = class {
     window.addEventListener("keydown", e => {
       if (!this.L.learning) return;
       if (e.code === "Tab") return;
+      // atalhos do navegador (Ctrl/Cmd/Alt e F1-F12, como F5 e Ctrl+R) passam
+      if (e.ctrlKey || e.metaKey || e.altKey || /^F\d{1,2}$/.test(e.key)) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       if (e.repeat) return;
@@ -62,9 +64,11 @@ RJ.LearnBar = class {
   async toggle(on = !this.L.learning) {
     if (on) {
       if (!this.host.on) this.host.power();
+      // sem Web MIDI (iPhone, WebView): avisa e nao entra no modo, senao o painel fica preso
+      if (!this.host.midi.supported) { this.msg = "MIDI unavailable in this browser"; this.render(); return; }
       this.L.start();
       this.msg = "";
-      try { await this.host.enableMidi(); } catch (e) { this.msg = "MIDI unavailable in this browser"; }
+      try { await this.host.enableMidi(); } catch (e) { this.L.stop(); this.msg = "MIDI unavailable in this browser"; }
     } else {
       this.L.stop();
       this.msg = "";

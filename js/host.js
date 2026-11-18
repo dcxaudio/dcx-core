@@ -91,6 +91,8 @@
       // a entrada MIDI e da pagina: o Learn vem primeiro, depois os mapas padrao dos aparelhos
       this.midi = new RJ.Midi({ ignore: opts.midiIgnore });
       this.midi.onMessage = d => this.on && this.learn.handle(d);
+      // controlador caiu com um botao aprendido apertado: solta tudo
+      this.midi.on("disconnect", () => this.learn.releaseAll());
       this.on = false;
       this.devices = new Map();   // id -> { dev, label, receive }
       this.outs = new Map();
