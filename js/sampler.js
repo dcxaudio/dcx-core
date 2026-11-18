@@ -9,6 +9,8 @@ window.RJ = window.RJ || {};
  * Sampler pelo microfone/entrada de audio.
  * Fluxo: open() pede permissao e liga o medidor; arm() espera o sinal passar
  * do limiar (threshold) e grava ate stop() ou ate o tempo maximo.
+ * onEnded (opcional) e chamado quando o sistema encerra o microfone; o sampler
+ * ja fechou sozinho e o proximo open() pede de novo.
  */
 RJ.Sampler = class {
   constructor(engine) {
@@ -21,20 +23,50 @@ RJ.Sampler = class {
     this.peak = 0;
     this.onLevel = null;
     this.onDone = null;
+    this.onEnded = null;   // opcional: o sistema encerrou o microfone
+    this.opening = null;
+    this.gen = 0;
   }
 
-  async open() {
+  /**
+   * Abre o microfone. Uma promessa so enquanto o pedido de permissao esta aberto
+   * (chamar de novo devolve a mesma). Se close() vier antes da permissao, a faixa
+   * que chegar depois e fechada na hora, e o microfone nao fica aberto fora de hora.
+   */
+  open() {
+    if (this.stream) { this.engine.ensure(); return Promise.resolve(); }
+    if (this.opening) return this.opening;
+    const gen = this.gen = (this.gen || 0) + 1;
+    const p = this.openNow(gen).finally(() => { if (this.opening === p) this.opening = null; });
+    this.opening = p;
+    return p;
+  }
+
+  async openNow(gen) {
     const ctx = this.engine.ensure();
-    if (this.stream) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       throw new Error("Este navegador nao permite gravar audio aqui");
     }
     if (RJ.setAudioSession) RJ.setAudioSession("play-and-record");
+    let stream;
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia({
+      stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       });
-    } catch (e) { if (RJ.setAudioSession) RJ.setAudioSession("playback"); throw e; }
+    } catch (e) { if (gen === this.gen && RJ.setAudioSession) RJ.setAudioSession("playback"); throw e; }
+    if (gen !== this.gen) {   // fechado enquanto esperava a permissao
+      stream.getTracks().forEach(t => t.stop());
+      return;
+    }
+    this.stream = stream;
+    // o sistema encerrou a faixa (ligacao, outro app, cabo): fecha e avisa quem usa
+    stream.getTracks().forEach(t => {
+      t.onended = () => {
+        if (this.stream !== stream) return;
+        this.close();
+        if (this.onEnded) this.onEnded();
+      };
+    });
     this.src = ctx.createMediaStreamSource(this.stream);
     // ScriptProcessor: antigo, mas funciona em todos os navegadores e ate abrindo o arquivo direto
     this.proc = ctx.createScriptProcessor(2048, 1, 1);
@@ -108,10 +140,14 @@ RJ.Sampler = class {
   }
 
   close() {
+    const pending = !!this.opening;
+    this.gen++;   // um open() ainda esperando a permissao descarta a faixa
+    this.opening = null;
+    if (pending && !this.stream && RJ.setAudioSession) RJ.setAudioSession("playback");
     if (this.proc) { this.proc.onaudioprocess = null; this.proc.disconnect(); }
     if (this.src) this.src.disconnect();
     if (this.mute) this.mute.disconnect();
-    if (this.stream) this.stream.getTracks().forEach(t => t.stop());
+    if (this.stream) this.stream.getTracks().forEach(t => { t.onended = null; t.stop(); });
     if (this.stream && RJ.setAudioSession) RJ.setAudioSession("playback");
     this.stream = null; this.state = "off"; this.level = 0;
   }
