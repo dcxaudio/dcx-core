@@ -43,6 +43,7 @@
       prefix,
       key: k => prefix + k,
       async get(k) { await wait(); return RJ.store.get(prefix + k); },
+      async getStrict(k) { await wait(); return RJ.store.getStrict(prefix + k); },
       async put(k, v) { await wait(); return RJ.store.put(prefix + k, v); },
     };
   };
